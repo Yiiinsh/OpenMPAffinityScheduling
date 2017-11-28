@@ -147,6 +147,18 @@ int is_queue_empty(work_queue *queue) {
   }
 }
 
+int get_most_workload_idx(work_queue *queue, int queue_cnt) {
+  int most_workload_idx = -1;
+  int most_work_load = 0;
+  for(int i = 0; i < queue_cnt; ++i) {
+    if(queue[i].workload > most_work_load) {
+      most_work_load = queue[i].workload;
+      most_workload_idx = i;
+    }
+  }
+  return most_workload_idx;
+}
+
 double a[N][N], b[N][N], c[N];
 int jmax[N];  
 
@@ -282,7 +294,19 @@ void runloop(int loopid)  {
     }
 
     /* Work stealing */
+    int idx;
+    while(-1 != (idx = get_most_workload_idx(work_queues, nthreads))) {
+      chunk stealed_work;
+      omp_set_lock(&work_queue_locks[idx]);
+      stealed_work = dequeue(&work_queues[idx]);
+      omp_unset_lock(&work_queue_locks[idx]);
 
+      switch(loopid) {
+        case 1: loop1chunk(stealed_work.lo,stealed_work.hi); break;
+        case 2: loop2chunk(stealed_work.lo,stealed_work.hi); break;
+      }
+    }
+#pragma omp barrier
 
     /* Resource release */
     destroy_work_queue(&work_queues[myid]);
