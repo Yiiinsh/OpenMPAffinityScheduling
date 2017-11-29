@@ -1,9 +1,10 @@
-CC = gcc-7
-CFLAGS = -fopenmp -std=c99
+CC = icc
+CFLAGS = -O3 -qopenmp -std=c99 
 
 EXE = loops2 
 
-SRC = loops2.c
+SRC = loops2.c workqueue.c
+INC = workqueue.h
 OBJ = $(SRC:.c=.o)
 
 all : $(EXE)
@@ -11,8 +12,8 @@ all : $(EXE)
 $(EXE) : $(OBJ)
 	   $(CC) $(CFLAGS) -o $@ $(OBJ)
 
-$(OBJ) : $(SRC)
-	$(CC) $(CFLAGS) -c $<
+$(OBJ) : %o : %c $(INC)
+	$(CC) $(CFLAGS) -c $< 
 
 
 .PHONY: clean
