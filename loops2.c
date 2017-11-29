@@ -147,16 +147,15 @@ int is_queue_empty(work_queue *queue) {
   }
 }
 
-int get_most_workload_idx(work_queue *queue, int queue_cnt) {
-  int most_workload_idx = -1;
-  int most_work_load = 0;
+void get_most_loaded(work_queue *queue, int queue_cnt, int *idx, int *left_workload) {
+  *idx = -1;
+  *left_workload = 0;
   for(int i = 0; i < queue_cnt; ++i) {
-    if(queue[i].workload > most_work_load) {
-      most_work_load = queue[i].workload;
-      most_workload_idx = i;
+    if(queue[i].workload > *left_workload) {
+      *left_workload = queue[i].workload;
+      *idx = i;
     }
   }
-  return most_workload_idx;
 }
 
 double a[N][N], b[N][N], c[N];
@@ -294,16 +293,26 @@ void runloop(int loopid)  {
     }
 
     /* Work stealing */
-    int idx;
-    while(-1 != (idx = get_most_workload_idx(work_queues, nthreads))) {
-      chunk stealed_work;
+    int idx, left_workload;
+    while(1) {
+      get_most_loaded(work_queues, nthreads, &idx, &left_workload);
+      if(-1 == idx) {
+        /* terminate */
+        break;
+      }
+      chunk stolen_work;
       omp_set_lock(&work_queue_locks[idx]);
-      stealed_work = dequeue(&work_queues[idx]);
+      if(work_queues[idx].workload != left_workload) {
+        /* Work stealed by others first */
+        omp_unset_lock(&work_queue_locks[idx]);
+        continue;
+      }
+      stolen_work = dequeue(&work_queues[idx]);
       omp_unset_lock(&work_queue_locks[idx]);
 
       switch(loopid) {
-        case 1: loop1chunk(stealed_work.lo,stealed_work.hi); break;
-        case 2: loop2chunk(stealed_work.lo,stealed_work.hi); break;
+        case 1: loop1chunk(stolen_work.lo,stolen_work.hi); break;
+        case 2: loop2chunk(stolen_work.lo,stolen_work.hi); break;
       }
     }
 #pragma omp barrier
